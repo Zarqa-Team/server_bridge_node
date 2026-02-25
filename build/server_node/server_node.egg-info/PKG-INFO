@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: server_node
+Version: 0.0.1
+Summary: ROS2 bridge node for competition simulation server
+Maintainer: Developer
+Maintainer-email: dev@example.com
+License: Apache License 2.0
+Requires-Dist: setuptools
+Requires-Dist: requests
+Dynamic: license
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary

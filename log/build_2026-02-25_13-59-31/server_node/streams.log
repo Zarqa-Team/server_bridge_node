@@ -1,0 +1,68 @@
+[0.325s] Invoking command in '/home/mo/ws_sensor_combined/src/server_node': PYTHONPATH=/home/mo/ws_sensor_combined/src/server_node/build/server_node/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/mo/ws_sensor_combined/src/server_node/install/server_node/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/server_node build --build-base /home/mo/ws_sensor_combined/src/server_node/build/server_node/build install --record /home/mo/ws_sensor_combined/src/server_node/build/server_node/install.log --install-scripts $base/lib/server_node --single-version-externally-managed install_data
+[0.397s] /home/mo/.local/lib/python3.10/site-packages/setuptools/dist.py:599: SetuptoolsDeprecationWarning: Invalid dash-separated key 'script-dir' in 'develop' (setup.cfg), please use the underscore name 'script_dir' instead.
+[0.397s] !!
+[0.397s] 
+[0.397s]         ********************************************************************************
+[0.397s]         Usage of dash-separated 'script-dir' will not be supported in future
+[0.397s]         versions. Please use the underscore name 'script_dir' instead.
+[0.397s] 
+[0.397s] 
+[0.397s]         Available configuration options are listed in:
+[0.397s]         https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
+[0.397s] 
+[0.397s]         By 2026-Mar-03, you need to update your project and remove deprecated calls
+[0.397s]         or your builds will no longer be supported.
+[0.397s] 
+[0.397s]         See https://github.com/pypa/setuptools/discussions/5011 for details.
+[0.397s]         ********************************************************************************
+[0.397s] 
+[0.397s] !!
+[0.397s]   opt = self._enforce_underscore(opt, section)
+[0.403s] /home/mo/.local/lib/python3.10/site-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+[0.403s]   warnings.warn(msg)
+[0.415s] /home/mo/.local/lib/python3.10/site-packages/setuptools/dist.py:599: SetuptoolsDeprecationWarning: Invalid dash-separated key 'script-dir' in 'develop' (setup.cfg), please use the underscore name 'script_dir' instead.
+[0.415s] !!
+[0.415s] 
+[0.415s]         ********************************************************************************
+[0.415s]         Usage of dash-separated 'script-dir' will not be supported in future
+[0.415s]         versions. Please use the underscore name 'script_dir' instead.
+[0.415s]         (Affected: server_node).
+[0.415s] 
+[0.415s]         Available configuration options are listed in:
+[0.416s]         https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
+[0.416s] 
+[0.416s]         By 2026-Mar-03, you need to update your project and remove deprecated calls
+[0.416s]         or your builds will no longer be supported.
+[0.416s] 
+[0.416s]         See https://github.com/pypa/setuptools/discussions/5011 for details.
+[0.416s]         ********************************************************************************
+[0.416s] 
+[0.416s] !!
+[0.416s]   opt = self._enforce_underscore(opt, section)
+[0.441s] running egg_info
+[0.447s] creating build/server_node/server_node.egg-info
+[0.447s] writing build/server_node/server_node.egg-info/PKG-INFO
+[0.447s] writing dependency_links to build/server_node/server_node.egg-info/dependency_links.txt
+[0.447s] writing entry points to build/server_node/server_node.egg-info/entry_points.txt
+[0.447s] writing requirements to build/server_node/server_node.egg-info/requires.txt
+[0.447s] writing top-level names to build/server_node/server_node.egg-info/top_level.txt
+[0.447s] writing manifest file 'build/server_node/server_node.egg-info/SOURCES.txt'
+[0.460s] reading manifest file 'build/server_node/server_node.egg-info/SOURCES.txt'
+[0.461s] writing manifest file 'build/server_node/server_node.egg-info/SOURCES.txt'
+[0.461s] running build
+[0.461s] running build_py
+[0.461s] running install
+[0.463s] running install_lib
+[0.469s] warning: install_lib: '/home/mo/ws_sensor_combined/src/server_node/build/server_node/build/lib' does not exist -- no Python modules to install
+[0.469s] 
+[0.469s] running install_data
+[0.469s] creating /home/mo/ws_sensor_combined/src/server_node/install/server_node/share/ament_index/resource_index/packages
+[0.469s] copying resource/server_node -> /home/mo/ws_sensor_combined/src/server_node/install/server_node/share/ament_index/resource_index/packages
+[0.469s] creating /home/mo/ws_sensor_combined/src/server_node/install/server_node/share/server_node
+[0.469s] copying package.xml -> /home/mo/ws_sensor_combined/src/server_node/install/server_node/share/server_node
+[0.469s] running install_egg_info
+[0.476s] Copying build/server_node/server_node.egg-info to /home/mo/ws_sensor_combined/src/server_node/install/server_node/lib/python3.10/site-packages/server_node-0.0.1-py3.10.egg-info
+[0.477s] running install_scripts
+[0.489s] Installing bridge script to /home/mo/ws_sensor_combined/src/server_node/install/server_node/lib/server_node
+[0.490s] writing list of installed files to '/home/mo/ws_sensor_combined/src/server_node/build/server_node/install.log'
+[0.501s] Invoked command in '/home/mo/ws_sensor_combined/src/server_node' returned '0': PYTHONPATH=/home/mo/ws_sensor_combined/src/server_node/build/server_node/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/mo/ws_sensor_combined/src/server_node/install/server_node/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/server_node build --build-base /home/mo/ws_sensor_combined/src/server_node/build/server_node/build install --record /home/mo/ws_sensor_combined/src/server_node/build/server_node/install.log --install-scripts $base/lib/server_node --single-version-externally-managed install_data

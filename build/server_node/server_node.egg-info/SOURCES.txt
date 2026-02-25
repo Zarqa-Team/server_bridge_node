@@ -1,0 +1,12 @@
+README.md
+package.xml
+setup.cfg
+setup.py
+build/server_node/server_node.egg-info/PKG-INFO
+build/server_node/server_node.egg-info/SOURCES.txt
+build/server_node/server_node.egg-info/dependency_links.txt
+build/server_node/server_node.egg-info/entry_points.txt
+build/server_node/server_node.egg-info/requires.txt
+build/server_node/server_node.egg-info/top_level.txt
+build/server_node/server_node.egg-info/zip-safe
+resource/server_node

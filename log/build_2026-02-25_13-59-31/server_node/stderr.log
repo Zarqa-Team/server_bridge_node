@@ -1,0 +1,42 @@
+/home/mo/.local/lib/python3.10/site-packages/setuptools/dist.py:599: SetuptoolsDeprecationWarning: Invalid dash-separated key 'script-dir' in 'develop' (setup.cfg), please use the underscore name 'script_dir' instead.
+!!
+
+        ********************************************************************************
+        Usage of dash-separated 'script-dir' will not be supported in future
+        versions. Please use the underscore name 'script_dir' instead.
+
+
+        Available configuration options are listed in:
+        https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
+
+        By 2026-Mar-03, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://github.com/pypa/setuptools/discussions/5011 for details.
+        ********************************************************************************
+
+!!
+  opt = self._enforce_underscore(opt, section)
+/home/mo/.local/lib/python3.10/site-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/home/mo/.local/lib/python3.10/site-packages/setuptools/dist.py:599: SetuptoolsDeprecationWarning: Invalid dash-separated key 'script-dir' in 'develop' (setup.cfg), please use the underscore name 'script_dir' instead.
+!!
+
+        ********************************************************************************
+        Usage of dash-separated 'script-dir' will not be supported in future
+        versions. Please use the underscore name 'script_dir' instead.
+        (Affected: server_node).
+
+        Available configuration options are listed in:
+        https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
+
+        By 2026-Mar-03, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://github.com/pypa/setuptools/discussions/5011 for details.
+        ********************************************************************************
+
+!!
+  opt = self._enforce_underscore(opt, section)
+warning: install_lib: '/home/mo/ws_sensor_combined/src/server_node/build/server_node/build/lib' does not exist -- no Python modules to install
+
