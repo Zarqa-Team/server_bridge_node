@@ -2,6 +2,9 @@
 """
 ROS2 Bridge Node for Competition Simulation Server
 Communicates with Flask server at http://127.0.0.1:5000
+
+Subscribes to aggregated telemetry data from TelemetryAggregatorNode
+and sends it to the server.
 """
 
 import json
@@ -21,34 +24,11 @@ class CompetitionBridgeNode(Node):
         self.username = "zarqa"
         self.password = "1234"
         self.request_timeout = 5.0
-        self.auth_token = None
         
-        # Static telemetry data
-        self.telemetry_data = {
-            "takim_numarasi": 1,
-            "iha_enlem": 41.508775,
-            "iha_boylam": 36.118335,
-            "iha_irtifa": 38,
-            "iha_dikilme": 7,
-            "iha_yonelme": 210,
-            "iha_yatis": -30,
-            "iha_hiz": 28,
-            "iha_batarya": 50,
-            "iha_otonom": 1,
-            "iha_kilitlenme": 0,  # 0: not locked
-            "hedef_merkez_X": 0,  # Target X 
-            "hedef_merkez_Y": 0,  # Target Y 
-            "hedef_genislik": 0,  # Target width 
-            "hedef_yukseklik": 0,  # Target height
-            "gps_saati": {
-                "saat": 12,
-                "dakika": 10,
-                "saniye": 5,
-                "milisaniye": 200
-            }
-        }
+        # Cache for telemetry data received from aggregator
+        self.telemetry_data = {}
         
-        # Published Topics
+        # Published Topics for server responses
         self.pub_server_time = self.create_publisher(String, '/competition/server_time', 10)
         self.pub_other_uavs = self.create_publisher(String, '/competition/other_uavs', 10)
         self.pub_qr_location = self.create_publisher(String, '/competition/qr_location', 10)
@@ -56,7 +36,15 @@ class CompetitionBridgeNode(Node):
         self.pub_lockdown_info = self.create_publisher(String, '/competition/lockdown_info', 10)
         self.pub_kamikaze_info = self.create_publisher(String, '/competition/kamikaze_info', 10)
         
-        # Subscribed Topics
+        # Subscribe to telemetry data from aggregator node
+        self.sub_telemetry = self.create_subscription(
+            String,
+            '/competition/telemetry_data',
+            self.telemetry_callback,
+            10
+        )
+        
+        # Subscriptions for mission control commands
         self.sub_kamikaze = self.create_subscription(
             String,
             '/mission/kamikaze_command',
@@ -77,12 +65,22 @@ class CompetitionBridgeNode(Node):
         self.login()
         
         # Creating timers
+        # Send telemetry to server at 0.6 second intervals
         self.telemetry_timer = self.create_timer(0.6, self.send_telemetry_callback)
+        # Fetch QR and HSS data from server every 5 seconds
         self.qr_hss_timer = self.create_timer(5.0, self.fetch_qr_hss_callback)
-          
-        self.test_lockdown_timer = self.create_timer(1, self.test_send_lockdown_callback)
-        self.test_kamikaze_timer = self.create_timer(1, self.test_send_kamikaze_callback)
+        
         self.get_logger().info("Competition Bridge Node started successfully")
+        self.get_logger().info(f"Telemetry server: {self.server_url}")
+        self.get_logger().info("Subscribing to telemetry data from aggregator node")
+    
+    def telemetry_callback(self, msg):
+        """Receive aggregated telemetry data from TelemetryAggregatorNode"""
+        try:
+            self.telemetry_data = json.loads(msg.data)
+            self.get_logger().debug("Telemetry data received from aggregator")
+        except json.JSONDecodeError:
+            self.get_logger().error("Failed to parse telemetry data from aggregator")
     
     def login(self):
         try:
@@ -99,7 +97,6 @@ class CompetitionBridgeNode(Node):
             
             if response.status_code == 200:
                 response_data = response.json()
-                self.auth_token = response_data.get("token")
                 self.get_logger().info(f"Login successful: {response_data}")
             else:
                 self.get_logger().error(
@@ -112,234 +109,138 @@ class CompetitionBridgeNode(Node):
         except Exception as e:
             self.get_logger().error(f"Unexpected error during login: {str(e)}")
     
-    def send_telemetry_callback(self):
+    def _make_request(self, method, endpoint, payload=None, success_handler=None):
+        """Generic HTTP request handler with error handling.
+        
+        Args:
+            method: 'GET' or 'POST'
+            endpoint: API endpoint path (e.g., 'telemetri_gonder')
+            payload: JSON payload for POST requests
+            success_handler: Callback function called with response_data on success
+        """
         try:
-            headers = {
-                "Content-Type": "application/json",
-                "X-Kadi": self.username
-            }
+            headers = {"X-Kadi": self.username}
+            if method.upper() == "POST":
+                headers["Content-Type"] = "application/json"
             
-            response = requests.post(
-                f"{self.server_url}/api/telemetri_gonder",
-                json=self.telemetry_data,
-                headers=headers,
-                timeout=self.request_timeout
-            )
+            url = f"{self.server_url}/api/{endpoint}"
+            
+            if method.upper() == "GET":
+                response = requests.get(url, headers=headers, timeout=self.request_timeout)
+            else:
+                response = requests.post(url, json=payload, headers=headers, timeout=self.request_timeout)
             
             if response.status_code == 200:
                 response_data = response.json()
-                
-                # Publish server time
-                if "sunucusaati" in response_data:
-                    msg = String()
-                    msg.data = json.dumps(response_data["sunucusaati"])
-                    self.pub_server_time.publish(msg)
-                
-                # Publish other UAVs location 
-                if "konumBilgileri" in response_data:
-                    msg = String()
-                    msg.data = json.dumps(response_data["konumBilgileri"])
-                    self.pub_other_uavs.publish(msg)
-                
-                self.get_logger().debug("Telemetry sent and processed successfully")
+                if success_handler:
+                    success_handler(response_data)
+                return response_data
             else:
-                self.get_logger().warn(
-                    f"Telemetry POST returned status {response.status_code}"
-                )
+                self.get_logger().warn(f"{endpoint} returned status {response.status_code}")
+                return None
         
         except requests.exceptions.Timeout:
-            self.get_logger().warn("Telemetry request timed out")
+            self.get_logger().warn(f"{endpoint} timed out")
         except requests.exceptions.ConnectionError:
-            self.get_logger().warn("Connection error sending telemetry")
+            self.get_logger().warn(f"Connection error: {endpoint}")
         except json.JSONDecodeError:
-            self.get_logger().warn("Invalid JSON in telemetry response")
+            self.get_logger().warn(f"Invalid JSON in {endpoint} response")
         except Exception as e:
-            self.get_logger().error(f"Unexpected error sending telemetry: {str(e)}")
+            self.get_logger().error(f"Error in {endpoint}: {str(e)}")
+        
+        return None
+    
+    def send_telemetry_callback(self):
+        """Send aggregated telemetry data to server"""
+        if not self.telemetry_data:
+            return
+        
+        def handle_telemetry_response(response_data):
+            # Publish server time if available
+            if "sunucusaati" in response_data:
+                msg = String()
+                msg.data = json.dumps(response_data["sunucusaati"])
+                self.pub_server_time.publish(msg)
+            
+            # Publish other UAVs location if available
+            if "konumBilgileri" in response_data:
+                msg = String()
+                msg.data = json.dumps(response_data["konumBilgileri"])
+                self.pub_other_uavs.publish(msg)
+            
+            self.get_logger().info("Telemetry sent successfully")
+        
+        self._make_request("POST", "telemetri_gonder", self.telemetry_data, handle_telemetry_response)
     
     def fetch_qr_hss_callback(self):
-        
-        # Fetch server time
+        """Fetch QR, HSS, and server time data from server"""
         self.fetch_server_time()
-        
-        # Fetch QR coordinates
         self.fetch_qr_coordinates()
-        
-        # Fetch HSS zones
         self.fetch_hss_zones()
     
     def fetch_qr_coordinates(self):
-        try:
-            headers = {
-                "X-Kadi": self.username
-            }
-            response = requests.get(
-                f"{self.server_url}/api/qr_koordinati",
-                headers=headers,
-                timeout=self.request_timeout
-            )
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                msg = String()
-                msg.data = json.dumps(response_data)
-                self.pub_qr_location.publish(msg)
-                self.get_logger().debug("QR coordinates fetched and published")
-            else:
-                self.get_logger().warn(
-                    f"QR coordinates fetch returned status {response.status_code}"
-                )
+        """Fetch QR coordinates from server"""
+        def handle_qr_response(response_data):
+            msg = String()
+            msg.data = json.dumps(response_data)
+            self.pub_qr_location.publish(msg)
+            self.get_logger().info("QR coordinates fetched and published")
         
-        except requests.exceptions.Timeout:
-            self.get_logger().warn("QR coordinates request timed out")
-        except requests.exceptions.ConnectionError:
-            self.get_logger().warn("Connection error fetching QR coordinates")
-        except json.JSONDecodeError:
-            self.get_logger().warn("Invalid JSON in QR coordinates response")
-        except Exception as e:
-            self.get_logger().error(f"Unexpected error fetching QR coordinates: {str(e)}")
+        self._make_request("GET", "qr_koordinati", success_handler=handle_qr_response)
     
     def fetch_server_time(self):
-        """Fetch server time from /api/sunucusaati endpoint."""
-        try:
-            headers = {
-                "X-Kadi": self.username
-            }
-            response = requests.get(
-                f"{self.server_url}/api/sunucusaati",
-                headers=headers,
-                timeout=self.request_timeout
-            )
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                msg = String()
-                msg.data = json.dumps(response_data)
-                self.pub_server_time.publish(msg)
-                self.get_logger().debug("Server time fetched and published")
-            else:
-                self.get_logger().warn(
-                    f"Server time fetch returned status {response.status_code}"
-                )
+        """Fetch server time from server"""
+        def handle_server_time_response(response_data):
+            msg = String()
+            msg.data = json.dumps(response_data)
+            self.pub_server_time.publish(msg)
+            self.get_logger().info("Server time fetched and published")
         
-        except requests.exceptions.Timeout:
-            self.get_logger().warn("Server time request timed out")
-        except requests.exceptions.ConnectionError:
-            self.get_logger().warn("Connection error fetching server time")
-        except json.JSONDecodeError:
-            self.get_logger().warn("Invalid JSON in server time response")
-        except Exception as e:
-            self.get_logger().error(f"Unexpected error fetching server time: {str(e)}")
+        self._make_request("GET", "sunucusaati", success_handler=handle_server_time_response)
     
     def fetch_hss_zones(self):
-        try:
-            headers = {
-                "X-Kadi": self.username
-            }
-            response = requests.get(
-                f"{self.server_url}/api/hss_koordinatlari",
-                headers=headers,
-                timeout=self.request_timeout
-            )
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                msg = String()
-                msg.data = json.dumps(response_data)
-                self.pub_hss_zones.publish(msg)
-                self.get_logger().debug("HSS zones fetched and published")
-            else:
-                self.get_logger().warn(
-                    f"HSS zones fetch returned status {response.status_code}"
-                )
+        """Fetch HSS zones from server"""
+        def handle_hss_response(response_data):
+            msg = String()
+            msg.data = json.dumps(response_data)
+            self.pub_hss_zones.publish(msg)
+            self.get_logger().info("HSS zones fetched and published")
         
-        except requests.exceptions.Timeout:
-            self.get_logger().warn("HSS zones request timed out")
-        except requests.exceptions.ConnectionError:
-            self.get_logger().warn("Connection error fetching HSS zones")
-        except json.JSONDecodeError:
-            self.get_logger().warn("Invalid JSON in HSS zones response")
-        except Exception as e:
-            self.get_logger().error(f"Unexpected error fetching HSS zones: {str(e)}")
+        self._make_request("GET", "hss_koordinatlari", success_handler=handle_hss_response)
     
     def send_lockdown_info(self, end_time_dict, is_autonomous=False):
-       
-        try:
-            headers = {
-                "Content-Type": "application/json",
-                "X-Kadi": self.username
-            }
-            
-            payload = {
-                "kilitlenmeBitisZamani": end_time_dict,
-                "otonom_kilitlenme": 1 if is_autonomous else 0
-            }
-            
-            response = requests.post(
-                f"{self.server_url}/api/kilitlenme_bilgisi",
-                json=payload,
-                headers=headers,
-                timeout=self.request_timeout
-            )
-            
-            if response.status_code == 200:
-                self.get_logger().info("Lockdown info sent successfully")
-                # Publish to ROS topic for testing
-                msg = String()
-                msg.data = json.dumps(payload)
-                self.pub_lockdown_info.publish(msg)
-            else:
-                self.get_logger().warn(
-                    f"Lockdown info POST returned status {response.status_code}: {response.text}"
-                )
+        """Send lockdown info to server"""
+        payload = {
+            "kilitlenmeBitisZamani": end_time_dict,
+            "otonom_kilitlenme": 1 if is_autonomous else 0
+        }
         
-        except requests.exceptions.Timeout:
-            self.get_logger().error("Lockdown info request timed out")
-        except requests.exceptions.ConnectionError:
-            self.get_logger().error("Connection error sending lockdown info")
-        except Exception as e:
-            self.get_logger().error(f"Unexpected error sending lockdown info: {str(e)}")
+        def handle_lockdown_response(response_data):
+            self.get_logger().info("Lockdown info sent successfully")
+            msg = String()
+            msg.data = json.dumps(payload)
+            self.pub_lockdown_info.publish(msg)
+        
+        self._make_request("POST", "kilitlenme_bilgisi", payload, handle_lockdown_response)
     
     def send_kamikaze_info(self, start_time_dict, end_time_dict, qr_text):
+        """Send kamikaze info to server"""
+        payload = {
+            "kamikazeBaslangicZamani": start_time_dict,
+            "kamikazeBitisZamani": end_time_dict,
+            "qrMetni": qr_text
+        }
         
-        try:
-            headers = {
-                "Content-Type": "application/json",
-                "X-Kadi": self.username
-            }
-            
-            payload = {
-                "kamikazeBaslangicZamani": start_time_dict,
-                "kamikazeBitisZamani": end_time_dict,
-                "qrMetni": qr_text
-            }
-            
-            response = requests.post(
-                f"{self.server_url}/api/kamikaze_bilgisi",
-                json=payload,
-                headers=headers,
-                timeout=self.request_timeout
-            )
-            
-            if response.status_code == 200:
-                self.get_logger().info(f"Kamikaze info sent successfully: {qr_text}")
-                # Publish to ROS topic for testing/monitoring
-                msg = String()
-                msg.data = json.dumps(payload)
-                self.pub_kamikaze_info.publish(msg)
-            else:
-                self.get_logger().warn(
-                    f"Kamikaze info POST returned status {response.status_code}: {response.text}"
-                )
+        def handle_kamikaze_response(response_data):
+            self.get_logger().info(f"Kamikaze info sent successfully: {qr_text}")
+            msg = String()
+            msg.data = json.dumps(payload)
+            self.pub_kamikaze_info.publish(msg)
         
-        except requests.exceptions.Timeout:
-            self.get_logger().error("Kamikaze info request timed out")
-        except requests.exceptions.ConnectionError:
-            self.get_logger().error("Connection error sending kamikaze info")
-        except Exception as e:
-            self.get_logger().error(f"Unexpected error sending kamikaze info: {str(e)}")
+        self._make_request("POST", "kamikaze_bilgisi", payload, handle_kamikaze_response)
     
     def update_lockdown_target(self, center_x, center_y, width, height, is_locked=True):
-        
+        """Update target lock status and coordinates in telemetry data"""
         if is_locked:
             self.telemetry_data["iha_kilitlenme"] = 1
             self.telemetry_data["hedef_merkez_X"] = center_x
@@ -347,7 +248,7 @@ class CompetitionBridgeNode(Node):
             self.telemetry_data["hedef_genislik"] = width
             self.telemetry_data["hedef_yukseklik"] = height
             self.get_logger().debug(
-                f"Lockdown target updated: X={center_x}, Y={center_y}, W={width}, H={height}"
+                f"Lockdown target updated: center=({center_x}, {center_y}), size={width}x{height}"
             )
         else:
             self.telemetry_data["iha_kilitlenme"] = 0
@@ -358,11 +259,11 @@ class CompetitionBridgeNode(Node):
             self.get_logger().debug("Lockdown target cleared")
     
     def kamikaze_subscription_callback(self, msg):
+        """Handle kamikaze command from mission control"""
         try:
             data = json.loads(msg.data)
             self.get_logger().info(f"Received kamikaze command: {data}")
             
-            # Extract data and send to server
             start_time = data.get("start_time", {})
             end_time = data.get("end_time", {})
             qr_text = data.get("qr_text", "")
@@ -378,11 +279,11 @@ class CompetitionBridgeNode(Node):
             self.get_logger().error(f"Error processing kamikaze command: {str(e)}")
     
     def lockdown_subscription_callback(self, msg):
+        """Handle lockdown command from mission control"""
         try:
             data = json.loads(msg.data)
             self.get_logger().info(f"Received lockdown command: {data}")
             
-            # Extract data and send to server
             end_time = data.get("end_time", {})
             is_autonomous = data.get("is_autonomous", False)
             
@@ -405,34 +306,7 @@ class CompetitionBridgeNode(Node):
             self.get_logger().error("Failed to parse lockdown command JSON")
         except Exception as e:
             self.get_logger().error(f"Error processing lockdown command: {str(e)}")
-    
-    def test_send_lockdown_callback(self):
-       
-        dummy_end_time = {
-            "saat": 12,
-            "dakika": 10,
-            "saniye": 15,
-            "milisaniye": 500
-        }
-        self.get_logger().info("Sending dummy lockdown info")
-        self.send_lockdown_info(dummy_end_time, is_autonomous=True)
-    
-    def test_send_kamikaze_callback(self):
-        
-        dummy_start_time = {
-            "saat": 12,
-            "dakika": 10,
-            "saniye": 0,
-            "milisaniye": 0
-        }
-        dummy_end_time = {
-            "saat": 12,
-            "dakika": 10,
-            "saniye": 25,
-            "milisaniye": 250
-        }
-        self.get_logger().info("Sending dummy kamikaze info")
-        self.send_kamikaze_info(dummy_start_time, dummy_end_time, "DUMMY_QR_CODE_123")
+
 
 def main(args=None):
     rclpy.init(args=args)

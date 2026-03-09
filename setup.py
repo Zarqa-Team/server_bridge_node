@@ -19,6 +19,7 @@ setup(
     license='Apache License 2.0',
     entry_points={
         'console_scripts': [
+            'telemetry_aggregator = server_node.telemetry_aggregator_node:main',
             'bridge = server_node.bridge:main',
         ],
     },
