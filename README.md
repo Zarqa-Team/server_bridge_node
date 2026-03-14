@@ -26,45 +26,8 @@ source install/setup.bash
 
 ---
 
-## 🚀 System Architecture
 
-### Component Layout
 
-```
-PX4 SITL (/fmu/out/*)
-    ↓
-┌──────────────────────────────────┐
-│ TelemetryAggregatorNode          │
-│ ────────────────────────────      │
-│ • Quaternion → Euler conversion  │
-│ • Velocity selection (v_ground/v_air)
-│ • GPS format validation          │
-│ • Time conversion (µs → dict)    │
-│                                  │
-│ QoS: BEST_EFFORT, depth=10       │
-│ Publish freq: 1 Hz               │
-└──────────────────────────────────┘
-    ↓ (/competition/telemetry_data)
-┌──────────────────────────────────┐
-│ CompetitionBridgeNode            │
-│ ────────────────────────────      │
-│ • HTTP/Auth to Flask             │
-│ • Telemetry send (0.6 Hz)        │
-│ • Data fetch (0.2 Hz: QR, HSS)   │
-│ • Mission commands (async)       │
-│                                  │
-│ Features:                         │
-│ - 5s request timeout             │
-│ - Automatic reconnection         │
-│ - JSON frame encoding            │
-└──────────────────────────────────┘
-    ↓ (HTTP + ROS topics)
-Flask Server (127.0.0.1:5000)
-```
-
----
-
-## 📋 Technical Specifications
 
 ### Telemetry Aggregator Node
 
@@ -85,12 +48,6 @@ Flask Server (127.0.0.1:5000)
 
 #### Processing Pipeline
 
-```python
-# Quaternion conversion (Hamilton convention)
-q = [x, y, z, w]
-roll = atan2(2(wx + yz), 1 - 2(x² + y²))
-pitch = asin(2(wy - zx))
-yaw = atan2(2(wz + xy), 1 - 2(y² + z²))
 
 # Velocity selection logic
 if ground_velocity > 0.5 m/s:
@@ -153,7 +110,7 @@ hours = floor(t_mod / 3600e6) % 24
 
 ## 🔍 Telemetry Data Extraction Map
 
-This section documents exactly how each telemetry field is extracted from PX4 topics, enabling reproduction on real hardware.
+This section documents exactly how each telemetry field is extracted from PX4 topics, to be then used to model real hardware.
 
 ### Topic-to-Telemetry Mapping Reference
 
@@ -447,107 +404,6 @@ last_airspeed = max(0.0, true_airspeed)
 
 ---
 
-### Sequence Diagram: Data Flow
-
-```
-PX4 SITL Sensors (10-100 Hz)
-    ↓
-    ├─ IMU (200 Hz) → EKF Estimate
-    │   ↓
-    │   └─ /fmu/out/vehicle_attitude (50 Hz)
-    │       VehicleAttitude.q[4] (quaternion)
-    │       └─ attitude_callback()
-    │           ├─ quaternion_to_euler()
-    │           ├─ Normalize angles: roll[-90,90], pitch[-90,90], yaw[0,360]
-    │           └─ Update: iha_dikilme, iha_yonelme, iha_yatis
-    │
-    ├─ GPS/Vision (25 Hz)
-    │   ↓
-    │   └─ /fmu/out/vehicle_global_position (25 Hz)
-    │       VehicleGlobalPosition (lat, lon, alt, timestamp)
-    │       └─ global_position_callback()
-    │           ├─ Auto-detect scaling (SITL vs Hardware)
-    │           ├─ gps_time_to_dict(microseconds)
-    │           └─ Update: iha_enlem, iha_boylam, iha_irtifa, gps_saati
-    │
-    ├─ State Estimator (50 Hz)
-    │   ↓
-    │   └─ /fmu/out/vehicle_local_position_v1 (50 Hz)
-    │       VehicleLocalPosition (vx, vy, vz)
-    │       └─ local_position_callback()
-    │           ├─ Calculate: ground_speed = sqrt(vx² + vy²)
-    │           ├─ Check: ground_speed > 0.5 m/s ?
-    │           ├─ If yes: use ground_speed
-    │           ├─ If no: use last_airspeed (fallback)
-    │           └─ Update: iha_hiz
-    │
-    ├─ Battery Monitor (2 Hz)
-    │   ↓
-    │   └─ /fmu/out/battery_status_v1 (2 Hz)
-    │       BatteryStatus (remaining: 0.0-1.0)
-    │       └─ battery_callback()
-    │           ├─ Clamp: [0, 1]
-    │           ├─ Scale: × 100
-    │           └─ Update: iha_batarya
-    │
-    ├─ Navigation Stack (5 Hz)
-    │   ↓
-    │   └─ /fmu/out/vehicle_status (5 Hz)
-    │       VehicleStatus (nav_state: enum)
-    │       └─ vehicle_status_callback()
-    │           ├─ Check: nav_state ∈ {3, 14} (mission/loiter)
-    │           └─ Update: iha_otonom (0 or 1)
-    │
-    └─ Airspeed Sensor (10 Hz)
-        ↓
-        └─ /fmu/out/airspeed_validated_v1 (10 Hz)
-            AirspeedValidated (true_airspeed_m_s)
-            └─ airspeed_callback()
-                ├─ Store: last_airspeed (used by local_position_callback)
-                └─ (not written directly to telemetry)
-
-                All callbacks update: self.telemetry_data{}
-                    ↓
-                Timer (1 Hz)
-                    ↓
-                publish_telemetry_callback()
-                    ├─ json.dumps(self.telemetry_data)
-                    └─ Publish to /competition/telemetry_data
-                        ↓
-                        Bridge Node subscribes
-                        ↓
-                        Sends to Flask server @ 0.6 Hz
-```
-
----
-
-### Implementation Checklist for Real Hardware
-
-When adapting this code to real aircraft hardware:
-
-**Coordinate Systems**:
-- [ ] Verify latitude/longitude scaling (1e7 for real hardware vs raw for SITL)
-- [ ] Confirm altitude reference (MSL vs AGL)
-- [ ] Check velocity frame (NED is standard for VehicleLocalPosition)
-
-**Sensor Calibration**:
-- [ ] Compass calibration (affects yaw/heading)
-- [ ] IMU accelerometer & gyro calibration (affects roll/pitch/yaw)
-- [ ] Battery capacity configuration (affects battery percentage reading)
-- [ ] Airspeed sensor calibration if using independent pitot tube
-
-**Topic Rates & Timing**:
-- [ ] Verify actual publish rates match expectations (25-30 Hz for GPS)
-- [ ] Check for message drops in logs (record with rosbag)
-- [ ] Monitor aggregator CPU usage at 1 Hz output
-
-**Edge Cases**:
-- [ ] GPS loss (will repeat last-known position)
-- [ ] Battery disconnect mid-flight (may drop to ~0% suddenly)
-- [ ] Magnetic interference (yaw drift without compass calibration)
-- [ ] Gimbal lock near 90° pitch (yaw undefined in Euler representation)
-
----
 
 **File**: `server_node/bridge.py`  
 **Process**: Server communication & command routing  
@@ -565,37 +421,14 @@ When adapting this code to real aircraft hardware:
 
 ```
 POST /api/giris (startup)
-├─ payload: {"kadi": "zarqa", "sifre": "1234"}
-└─ response: token info (unused in current impl)
-
 POST /api/telemetri_gonder (0.6 Hz)
-├─ payload: <telemetry_data JSON>
-├─ timeout: 5s
-├─ headers: {"X-Kadi": "zarqa", "Content-Type": "application/json"}
-└─ response: {"sunucusaati": {...}, "konumBilgileri": [...]}
 
 GET /api/qr_koordinati (5s interval)
-├─ timeout: 5s
-├─ headers: {"X-Kadi": "zarqa"}
-└─ response: QR coordinates JSON
-
 GET /api/hss_koordinatlari (5s interval)
-├─ timeout: 5s
-├─ headers: {"X-Kadi": "zarqa"}
-└─ response: HSS zones JSON
-
 GET /api/sunucusaati (5s interval)
-├─ timeout: 5s
-├─ headers: {"X-Kadi": "zarqa"}
-└─ response: Server time JSON
 
 POST /api/kilitlenme_bilgisi (async)
-├─ payload: {"kilitlenmeBitisZamani": {...}, "otonom_kilitlenme": <0|1>}
-└─ timeout: 5s
-
 POST /api/kamikaze_bilgisi (async)
-├─ payload: {"kamikazeBaslangicZamani": {...}, "kamikazeBitisZamani": {...}, "qrMetni": string}
-└─ timeout: 5s
 ```
 
 #### Output Topics
@@ -642,79 +475,6 @@ POST /api/kamikaze_bilgisi (async)
 | `hedef_yukseklik` | int | ≥ 0 | target tracking | Target bounding box height (pixels) |
 | `gps_saati` | struct | — | `/fmu/out/vehicle_global_position` timestamp | Converted from microseconds to {saat, dakika, saniye, milisaniye} |
 
-#### Quaternion-to-Euler Conversion
-
-Implementation uses Hamilton convention (wxyz):
-
-```python
-def quaternion_to_euler(q_x, q_y, q_z, q_w):
-    # q = (x, y, z, w)
-    roll = math.atan2(2*(q_w*q_x + q_y*q_z), 1 - 2*(q_x**2 + q_y**2))
-    pitch = math.asin(2*(q_w*q_y - q_z*q_x))
-    yaw = math.atan2(2*(q_w*q_z + q_x*q_y), 1 - 2*(q_y**2 + q_z**2))
-    
-    # Convert radians to degrees
-    return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
-```
-
-**Singularity**: Pitch ≈ ±90° → gimbal lock. Yaw becomes undefined; use raw quaternion for this edge case.
-
----
-
-## Data Flow
-
-### Normal Operation Flow
-
-```
-Every 1 second (1 Hz):
-   PX4 Sensors
-        ↓
-   Aggregator (processes)
-        ↓
-   /competition/telemetry_data (published)
-        ↓
-   Bridge (picks up data)
-        ↓
-   Every 0.6s sends to Flask server
-        ↓
-   Server responds with other UAVs' data
-        ↓
-   /competition/other_uavs (published)
-
-Every 5 seconds in parallel:
-   Bridge fetches QR coordinates
-        ↓
-   /competition/qr_location (published)
-   
-   Bridge fetches HSS zones
-        ↓
-   /competition/hss_zones (published)
-   
-   Bridge fetches server time
-        ↓
-   /competition/server_time (published)
-```
-
-### When Mission Command Arrives
-
-```
-External Node sends:
-   /mission/lockdown_command (with target data)
-        ↓
-   Bridge receives
-        ↓
-   Bridge processes JSON
-        ↓
-   Sends POST to /api/kilitlenme_bilgisi
-        ↓
-   Server processes
-        ↓
-   Bridge publishes to /competition/lockdown_info
-```
-
----
-
-## 📡 Topics Reference
 
 ### Complete Topic List
 
