@@ -25,6 +25,9 @@ class CompetitionBridgeNode(Node):
         self.password = "1234"
         self.request_timeout = 5.0
         
+        # Toggle to send default 0 values for lockdown and kamikaze at startup
+        self.send_default_lockdown_kamikaze = True
+        
         # Cache for telemetry data received from aggregator
         self.telemetry_data = {}
         
@@ -63,6 +66,12 @@ class CompetitionBridgeNode(Node):
         
         # Login at startup
         self.login()
+        
+        # Send default lockdown and kamikaze info with 0 values if feature is enabled
+        if self.send_default_lockdown_kamikaze:
+            default_time = {"saat": 0, "dakika": 0, "saniye": 0, "milisaniye": 0}
+            self.send_lockdown_info(default_time, is_autonomous=0)
+            self.send_kamikaze_info(default_time, default_time, "")
         
         # Creating timers
         # Send telemetry to server at 0.6 second intervals
