@@ -454,4 +454,44 @@ POST /api/kamikaze_bilgisi (async)
 - **`/mission/lockdown_command`** - Commands from mission planner - JSON format
 - **`/mission/kamikaze_command`** - Commands from mission planner - JSON format
 
----
+#### Lockdown Command Format
+
+For `/mission/lockdown_command`, the expected JSON structure:
+
+```json
+{
+  "end_time": {
+    "saat": 11,
+    "dakika": 41,
+    "saniye": 03,
+    "milisaniye": 141
+  },
+  "is_autonomous": false,
+  "center_x": 100.5,
+  "center_y": 200.3,
+  "width": 50,
+  "height": 50
+}
+```
+
+#### Kamikaze Command Format
+
+For `/mission/kamikaze_command`, the expected JSON structure:
+
+```json
+{
+  "start_time": {
+    "saat": 11,
+    "dakika": 41,
+    "saniye": 03,
+    "milisaniye": 141
+  },
+  "end_time": {
+    "saat": 11,
+    "dakika": 50,
+    "saniye": 15,
+    "milisaniye": 500
+  },
+  "qr_text": "TARGET_QR_CODE_123"
+}
+```
