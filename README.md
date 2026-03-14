@@ -16,19 +16,6 @@ colcon build --packages-select server_node --symlink-install
 
 source install/setup.bash
 ```
-
-### Requirements
-
-- ROS2 Humble
-- Python 3.10+
-- px4_msgs (auto-installed from ROS index)
-- requests library
-
----
-
-
-
-
 ### Telemetry Aggregator Node
 
 **File**: `server_node/telemetry_aggregator_node.py`  
@@ -46,32 +33,6 @@ source install/setup.bash
 | `/fmu/out/vehicle_status` | `VehicleStatus` | ~5 Hz | `nav_state` |
 | `/fmu/out/airspeed_validated_v1` | `AirspeedValidated` | ~10 Hz | `true_airspeed_m_s` |
 
-#### Processing Pipeline
-
-
-# Velocity selection logic
-if ground_velocity > 0.5 m/s:
-    use ground_speed
-elif airspeed > 0:
-    use airspeed  # SITL fallback
-else:
-    use ground_speed
-
-# GPS coordinate detection (auto-scaling)
-if |lat| > 1000 OR |lon| > 1000:
-    # Real hardware format (degrees × 1e7)
-    lat = msg.lat / 1e7
-    lon = msg.lon / 1e7
-else:
-    # SITL format (degrees)
-    lat = msg.lat
-    lon = msg.lon
-
-# Time conversion (microseconds → struct)
-t_days = floor(µs / (24*3600*1e6))
-t_mod = µs % (24*3600*1e6)
-hours = floor(t_mod / 3600e6) % 24
-```
 
 #### Output Topic
 
